@@ -6,3 +6,5 @@ __pycache__/
 .temp/
 *.log
 .DS_Store
+utils/gpt_analyzer.py
+.env

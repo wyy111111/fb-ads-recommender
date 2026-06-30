@@ -51,6 +51,13 @@ from utils.ai_analyzer import (
     CreativeAngle,
 )
 
+# GPT 外部分析器（可选，本地使用，不入库）
+try:
+    from utils.gpt_analyzer import GPTAnalyzer
+    _GPT_AVAILABLE = True
+except ImportError:
+    _GPT_AVAILABLE = False
+
 # ═══════════════════════════════════════════════════════════════════
 # Page config
 # ═══════════════════════════════════════════════════════════════════
@@ -808,6 +815,40 @@ def render_strategy_results():
     st.markdown("---")
     st.header("AI 策略分析")
     render_ai_analysis_area(cards)
+
+    # ── GPT 补充分析区（本地可选） ──
+    if _GPT_AVAILABLE:
+        st.markdown("---")
+        st.header("GPT 补充分析")
+        with st.expander("展开 GPT 创意与文案分析", expanded=False):
+            st.caption("调用 OpenAI 补充文案创意、跨行业灵感和优化盲点。")
+            if st.button("生成 GPT 分析", key="gpt_analyze_btn"):
+                with st.spinner("GPT 分析中..."):
+                    # 取第一个卡片的元信息
+                    first = cards[0]
+                    pname = first.product_name
+                    ind = getattr(first, "industry", "")
+                    price = float(getattr(first, "unit_price_usd", 0) or 0)
+                    margin = float(getattr(first, "profit_margin_pct", 0) or 0)
+                    result = GPTAnalyzer.analyze(
+                        cards, product_name=pname, industry=ind,
+                        unit_price=price, margin_pct=margin,
+                    )
+                    if result:
+                        st.markdown(result)
+                    else:
+                        st.warning(
+                            "未检测到有效的 OpenAI API Key。\n\n"
+                            "请在项目根目录创建 `.env` 文件，写入：\n"
+                            "```\nOPENAI_API_KEY=sk-你的key\n```\n"
+                            "或设置系统环境变量 `OPENAI_API_KEY`。"
+                        )
+    else:
+        st.markdown("---")
+        st.caption(
+            "如需启用 GPT 外部 AI 分析，请安装依赖后重启："
+            " `pip install openai python-dotenv`"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════
