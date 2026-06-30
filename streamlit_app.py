@@ -1,6 +1,6 @@
 
 """
-Facebook 投流策略推荐工具 — Streamlit Web 界面 v2.0
+Facebook 投流策略推荐工具 — Streamlit Web 界面 v2.1
 三段式策略卡片 / 智能行业识别 / B2B优先 / USD全量标注
 """
 
@@ -861,6 +861,38 @@ def render_cards(cards: List[StrategyCard]):
         tariff_rate = tariff["effective_tariff_rate"]
         freshness_tag = getattr(card, 'data_freshness', 'normal')
         stale_warning = ' <span style="color:#ef4444;font-size:11px;">⚠ 数据超过12个月未更新</span>' if freshness_tag == "stale" else ""
+
+        # ── 小众工业品调整信息（v3.5 new） ──
+        niche_html = ""
+        niche_info = getattr(card, 'niche_adjustment_info', None)
+        if niche_info and niche_info.get("applied"):
+            cat_name = niche_info.get("category", "")
+            factors = niche_info.get("factors", {})
+            pre_ctr = niche_info.get("pre_ctr", 0)
+            pre_cpc = niche_info.get("pre_cpc", 0)
+            adj_ctr = niche_info.get("adjusted_ctr", 0)
+            adj_cpc = niche_info.get("adjusted_cpc", 0)
+            confidence = niche_info.get("confidence", "")
+            data_source = niche_info.get("data_source", "")
+            notes = niche_info.get("notes", "")
+            niche_html = f"""
+            <details style="margin:8px 0;padding:8px 12px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:12px;">
+                <summary style="cursor:pointer;font-weight:600;color:#92400e;">⚠ 小众工业品类调整已应用：{cat_name}</summary>
+                <div style="margin-top:6px;color:#78350f;line-height:1.6;">
+                    <div>当前产品属于小众工业品类（{cat_name}），Facebook 无对应类目映射，已应用调整系数。</div>
+                    <div style="margin:6px 0;">
+                        <strong>调整前后对比：</strong>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:4px;">
+                            <div>CTR: {pre_ctr:.4f}% → <strong>{adj_ctr:.4f}%</strong> (×{factors.get("ctr_factor",1):.2f})</div>
+                            <div>CPC: ${pre_cpc:.4f} → <strong>${adj_cpc:.4f} USD</strong> (×{factors.get("cpc_factor",1):.2f})</div>
+                        </div>
+                    </div>
+                    <div style="margin:4px 0;"><strong>数据来源：</strong>{data_source}</div>
+                    <div style="margin:4px 0;"><strong>可信度：</strong>{confidence}</div>
+                    <div style="margin:4px 0;"><strong>投放注意事项：</strong>{notes}</div>
+                </div>
+            </details>"""
+
         shipping_tariff_html = f"""
                         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:8px;">
                             <div><span style="color:#6b7280;">预估运费/件</span><br><strong style="color:#0891b2;">${ship_unit:.2f} USD</strong></div>
@@ -1037,6 +1069,7 @@ def render_comparison_table(cards: List[StrategyCard]):
             "ROI": f"{card.roi_estimate:.2f}x",
             "市场": card.market,
             "类型": card.business_type,
+            "小众品类": getattr(card, 'niche_industrial_category', '') or "—",
         })
 
     df = pd.DataFrame(rows)

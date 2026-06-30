@@ -18,6 +18,21 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+
+# ── 小众工业品数据层（v3.5 新增） ──
+try:
+    from utils.niche_industrial_data import (
+        NICHE_INDUSTRIAL_ADJUSTMENTS,
+        apply_niche_adjustment,
+        match_niche_category,
+    )
+    _NICHE_INDUSTRIAL_AVAILABLE = True
+except ImportError:
+    _NICHE_INDUSTRIAL_AVAILABLE = False
+    NICHE_INDUSTRIAL_ADJUSTMENTS = {}
+    def apply_niche_adjustment(*args, **kwargs): return None
+    def match_niche_category(*args, **kwargs): return None
+
 # ═══════════════════════════════════════════════════════════════════
 # 0. 常量 — 行业基准数据库 (13 个行业)
 #    新增 expected_ctr / expected_cpc / expected_cpa / expected_roas
@@ -1039,6 +1054,8 @@ class EnrichmentResult:
     updated: str = ""                             # 数据最后更新时间 (YYYY-MM)
     enriched: bool = False                       # 是否成功富化
     search_query: Optional[str] = None           # 生成的搜索查询词
+    niche_industrial_category: str = ""           # 小众工业品品类名（v3.5 new）
+    niche_adjustment: Optional[Dict] = None       # 小众工业品调整信息（v3.5 new）
 
 
 class ProductEnricher:
@@ -1141,7 +1158,8 @@ class ProductEnricher:
         查询优先级：
         1. PRODUCT_PRICE_REFERENCE 末级查表（最精确）
         2. INDUSTRIAL_SUBCATEGORIES 子类参考（次精确）
-        3. 生成搜索查询词（供外部搜索接口使用）
+        3. 小众工业品匹配（v3.5，关键词匹配 NICHE_INDUSTRIAL_ADJUSTMENTS）
+        4. 生成搜索查询词（供外部搜索接口使用）
 
         Args:
             product_name: 产品名称
@@ -1183,7 +1201,20 @@ class ProductEnricher:
             result.search_query = ProductEnricher.generate_search_queries(product_name)[0]
             return result
 
-        # ── 第 3 级：未匹配 — 生成搜索建议 ──
+        # ── 第 3 级（新增 v3.5）：小众工业品调整 — 关键词匹配 ──
+        if _NICHE_INDUSTRIAL_AVAILABLE:
+            niche_info = apply_niche_adjustment(product_name)
+            if niche_info and niche_info.get("applied"):
+                result.niche_industrial_category = niche_info["category"]
+                result.niche_adjustment = niche_info
+                # 不修改 unit_price/margin（保留默认值），仅标记以便后续 KPI 调整
+                result.data_source = f"小众工业品调整: {niche_info['category']}"
+                result.confidence = "low"
+                result.enriched = True
+                result.search_query = ProductEnricher.generate_search_queries(product_name)[0]
+                return result
+
+        # ── 第 4 级：未匹配 — 生成搜索建议 ──
         result.search_query = ProductEnricher.generate_search_queries(product_name)[0]
         result.data_source = "no local match — consider external search"
         result.confidence = "unknown"
@@ -1404,7 +1435,7 @@ OBJECTIVE_LABELS: Dict[str, str] = {
 # 0-b. 模型版本 & 校准因子 & 数据来源标注
 # ═══════════════════════════════════════════════════════════════════
 
-MODEL_VERSION = "v3.4"
+MODEL_VERSION = "v3.5"
 MODEL_LAST_UPDATED = "2026-06-30"
 
 # KPI 数据来源标注模板 — 每个指标的数据源与可信度等级
@@ -1655,6 +1686,35 @@ class AdsStrategyEngine:
         ind_cpa = industry.get("expected_cpa")
         cpa_calculated = eff_price * (eff_margin / 100.0) * self.CPA_BUFFER
         expected_cpa = ind_cpa if ind_cpa is not None else cpa_calculated
+
+        # ── 小众工业品调整（v3.5）：第四级匹配，最高优先级 ──
+        niche_cat = getattr(product, "niche_industrial_category", "")
+        niche_adj = getattr(product, "niche_adjustment", None)
+        niche_info_out = None  # 用于写入 StrategyCard
+
+        if niche_adj and niche_adj.get("applied"):
+            niche_info_out = niche_adj
+            factors = niche_adj["factors"]
+            orig_ctr_before_niche = expected_ctr_pct
+            orig_cpc_before_niche = expected_cpc
+            # 注意：这里 expected_ctr_pct/expected_cpc 目前仍是行业基准值
+            # niche 基于 WordStream Industrial 基准（ctr 1.36%, cpc 0.86）调整
+            baseline_ctr = niche_adj.get("baseline_ctr", 1.36)
+            baseline_cpc = niche_adj.get("baseline_cpc", 0.86)
+            baseline_cvr = niche_adj.get("baseline_cvr", 9.34)
+            baseline_cpl = niche_adj.get("baseline_cpl", 37.34)
+
+            expected_ctr_pct = round(baseline_ctr * factors["ctr_factor"], 4)
+            expected_cpc = round(baseline_cpc * factors["cpc_factor"], 4)
+            # cpu/cpl 用于后续 CVR/CPL 预估值
+            niche_cvr = round(baseline_cvr * factors["cvr_factor"], 4)
+            niche_cpl = round(baseline_cpl * factors["cpl_factor"], 2)
+
+            # 在 niche_info_out 中记录调整前后的值（用于前端展示）
+            niche_info_out["pre_ctr"] = orig_ctr_before_niche
+            niche_info_out["pre_cpc"] = orig_cpc_before_niche
+            niche_info_out["pre_cvr"] = baseline_cvr
+            niche_info_out["pre_cpl"] = baseline_cpl
 
         # ── 工业子类因子：对兜底基准做差异化调节 ──
         if sub:
@@ -1991,6 +2051,13 @@ class SmartInferrer:
             if enrichment.data_source:
                 enrichment_source = enrichment.data_source
 
+        # ── 小众工业品标记（来自 ProductEnricher） ──
+        niche_cat = ""
+        niche_adj = None
+        if enrichment is not None and enrichment.niche_industrial_category:
+            niche_cat = enrichment.niche_industrial_category
+            niche_adj = enrichment.niche_adjustment
+
         return Product(
             id="",
             name=name,
@@ -2005,6 +2072,8 @@ class SmartInferrer:
             enriched_margin=enriched_mg,
             enrichment_source=enrichment_source,
             enrichment_applied=enrichment_applied,
+            niche_industrial_category=niche_cat,
+            niche_adjustment=niche_adj,
         )
 
     @staticmethod
