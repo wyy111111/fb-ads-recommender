@@ -1,0 +1,99 @@
+========================================================================
+  Facebook 投流策略推荐报告 — 工业耗材 (砂纸/砂带)
+  生成时间: 2026-06-29 13:45:15
+========================================================================
+
+  [1] Premium Ceramic Sanding Disc 5" (SP-001)  ★★★★★
+      主推目标: 转化 (Conversions)
+      权重分解: 互动=30%  转化=45%  流量=25%
+      日预算:   $20.00 ~ $80.00
+      出价区间: $0.586 ~ $1.759
+      CPA 上限: $0.48
+      投放时段: 15:00-03:00 UTC (美东 10:00-22:00)
+      出价策略: target_cost
+      受众特征:
+        · 制造业采购经理 (Procurement Manager)
+        · 工厂主 / 车间主管 (Factory Owner / Shop Floor Manager)
+        · 五金 / 工具批发商 (Hardware & Tool Wholesaler)
+        · 金属加工 / 木工企业主 (Metalworking & Woodworking Business Owner)
+      Lookalike 源: 现有 B2B 客户列表 / 展会名片
+      版位偏好: Facebook Feed, Instagram Feed, Audience Network
+      KPI 基准:
+        CTR=1.20%  CPC=$0.850  CPM=$12.50  CPA=$56.67
+
+  [2] Waterproof Silicon Carbide Sandpaper Sheet (SP-003)  ★★★★★
+      主推目标: 互动 (Engagement)
+      权重分解: 互动=50%  转化=20%  流量=30%
+      日预算:   $9.00 ~ $36.00
+      出价区间: $0.124 ~ $0.373
+      CPA 上限: $0.06
+      投放时段: 03:00-15:00 UTC (本地 10:00-22:00)
+      出价策略: target_cost
+      受众特征:
+        · 制造业采购经理 (Procurement Manager)
+        · 工厂主 / 车间主管 (Factory Owner / Shop Floor Manager)
+        · 五金 / 工具批发商 (Hardware & Tool Wholesaler)
+        · 金属加工 / 木工企业主 (Metalworking & Woodworking Business Owner)
+      Lookalike 源: 现有 B2B 客户列表 / 展会名片
+      版位偏好: Facebook Feed, Instagram Feed, Audience Network
+      KPI 基准:
+        CTR=1.80%  CPC=$0.180  CPM=$3.50  CPA=$12.00
+
+  [3] Eco-Friendly Velcro Sanding Disc 150mm (SP-005)  ★★★★★
+      主推目标: 互动 (Engagement)
+      权重分解: 互动=50%  转化=20%  流量=30%
+      日预算:   $20.00 ~ $80.00
+      出价区间: $0.510 ~ $1.530
+      CPA 上限: $0.23
+      投放时段: 15:00-03:00 UTC (美东 10:00-22:00)
+      出价策略: lowest_cost
+      受众特征:
+        · DIY 爱好者 (DIY Enthusiast)
+        · 家庭装修用户 (Home Improvement Shopper)
+        · 木工 / 手工兴趣人群 (Woodworking & Craft Hobbyist)
+        · 汽车美容 / 改装爱好者 (Auto Detailing & Modification Enthusiast)
+      Lookalike 源: 网站访客 / 加购未支付用户
+      版位偏好: Facebook Feed, Instagram Feed, Instagram Reels, Facebook Marketplace
+      KPI 基准:
+        CTR=1.20%  CPC=$0.850  CPM=$12.50  CPA=$28.33
+
+  [4] Zirconia Flap Disc 4.5" (SP-004)  ★★★★
+      主推目标: 转化 (Conversions)
+      权重分解: 互动=30%  转化=45%  流量=25%
+      日预算:   $11.00 ~ $44.00
+      出价区间: $0.207 ~ $0.621
+      CPA 上限: $0.30
+      投放时段: 07:00-20:00 UTC (本地 10:00-23:00)
+      出价策略: target_cost
+      受众特征:
+        · 制造业采购经理 (Procurement Manager)
+        · 工厂主 / 车间主管 (Factory Owner / Shop Floor Manager)
+        · 五金 / 工具批发商 (Hardware & Tool Wholesaler)
+        · 金属加工 / 木工企业主 (Metalworking & Woodworking Business Owner)
+      Lookalike 源: 现有 B2B 客户列表 / 展会名片
+      版位偏好: Facebook Feed, Instagram Feed, Audience Network
+      KPI 基准:
+        CTR=1.50%  CPC=$0.300  CPM=$5.00  CPA=$20.00
+
+  [5] Aluminum Oxide Sanding Belt 6"x48" (SP-002)  ★★★
+      主推目标: 转化 (Conversions)
+      权重分解: 互动=10%  转化=65%  流量=25%
+      日预算:   $17.00 ~ $68.00
+      出价区间: $0.448 ~ $1.346
+      CPA 上限: $1.19
+      投放时段: 07:00-21:00 UTC (欧洲中部 08:00-22:00)
+      出价策略: target_cost
+      受众特征:
+        · 制造业采购经理 (Procurement Manager)
+        · 工厂主 / 车间主管 (Factory Owner / Shop Floor Manager)
+        · 五金 / 工具批发商 (Hardware & Tool Wholesaler)
+        · 金属加工 / 木工企业主 (Metalworking & Woodworking Business Owner)
+      Lookalike 源: 现有 B2B 客户列表 / 展会名片
+      版位偏好: Facebook Feed, Instagram Feed, Audience Network
+      KPI 基准:
+        CTR=1.35%  CPC=$0.650  CPM=$10.00  CPA=$43.33
+
+========================================================================
+  共 5 个产品，按投流优先级排序
+========================================================================
+（内容由AI生成，仅供参考）

@@ -1,0 +1,212 @@
+{
+  "generated_at": "2026-06-29T13:45:15.043643",
+  "total_products": 5,
+  "strategies": [
+    {
+      "product_id": "SP-001",
+      "product_name": "Premium Ceramic Sanding Disc 5\"",
+      "recommended_objective": "conversions",
+      "objective_label": "转化 (Conversions)",
+      "objective_weights": {
+        "engagement": 0.3,
+        "conversions": 0.45,
+        "traffic": 0.25
+      },
+      "daily_budget_range_usd": {
+        "min": 20.0,
+        "max": 80.0
+      },
+      "bid_range_usd": {
+        "min": 0.586,
+        "max": 1.759
+      },
+      "max_cpa_usd": 0.48,
+      "audience_profiles": [
+        "制造业采购经理 (Procurement Manager)",
+        "工厂主 / 车间主管 (Factory Owner / Shop Floor Manager)",
+        "五金 / 工具批发商 (Hardware & Tool Wholesaler)",
+        "金属加工 / 木工企业主 (Metalworking & Woodworking Business Owner)"
+      ],
+      "lookalike_source": "现有 B2B 客户列表 / 展会名片",
+      "placement_preference": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Audience Network"
+      ],
+      "bid_strategy": "target_cost",
+      "recommended_peak_hours": "15:00-03:00 UTC (美东 10:00-22:00)",
+      "kpi_benchmarks": {
+        "expected_ctr_pct": 1.2,
+        "expected_cpc_usd": 0.85,
+        "expected_cpm_usd": 12.5,
+        "expected_cpa_usd": 56.67
+      },
+      "priority": 1
+    },
+    {
+      "product_id": "SP-003",
+      "product_name": "Waterproof Silicon Carbide Sandpaper Sheet",
+      "recommended_objective": "engagement",
+      "objective_label": "互动 (Engagement)",
+      "objective_weights": {
+        "engagement": 0.5,
+        "conversions": 0.2,
+        "traffic": 0.3
+      },
+      "daily_budget_range_usd": {
+        "min": 9.0,
+        "max": 36.0
+      },
+      "bid_range_usd": {
+        "min": 0.124,
+        "max": 0.373
+      },
+      "max_cpa_usd": 0.06,
+      "audience_profiles": [
+        "制造业采购经理 (Procurement Manager)",
+        "工厂主 / 车间主管 (Factory Owner / Shop Floor Manager)",
+        "五金 / 工具批发商 (Hardware & Tool Wholesaler)",
+        "金属加工 / 木工企业主 (Metalworking & Woodworking Business Owner)"
+      ],
+      "lookalike_source": "现有 B2B 客户列表 / 展会名片",
+      "placement_preference": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Audience Network"
+      ],
+      "bid_strategy": "target_cost",
+      "recommended_peak_hours": "03:00-15:00 UTC (本地 10:00-22:00)",
+      "kpi_benchmarks": {
+        "expected_ctr_pct": 1.8,
+        "expected_cpc_usd": 0.18,
+        "expected_cpm_usd": 3.5,
+        "expected_cpa_usd": 12.0
+      },
+      "priority": 1
+    },
+    {
+      "product_id": "SP-005",
+      "product_name": "Eco-Friendly Velcro Sanding Disc 150mm",
+      "recommended_objective": "engagement",
+      "objective_label": "互动 (Engagement)",
+      "objective_weights": {
+        "engagement": 0.5,
+        "conversions": 0.2,
+        "traffic": 0.3
+      },
+      "daily_budget_range_usd": {
+        "min": 20.0,
+        "max": 80.0
+      },
+      "bid_range_usd": {
+        "min": 0.51,
+        "max": 1.53
+      },
+      "max_cpa_usd": 0.23,
+      "audience_profiles": [
+        "DIY 爱好者 (DIY Enthusiast)",
+        "家庭装修用户 (Home Improvement Shopper)",
+        "木工 / 手工兴趣人群 (Woodworking & Craft Hobbyist)",
+        "汽车美容 / 改装爱好者 (Auto Detailing & Modification Enthusiast)"
+      ],
+      "lookalike_source": "网站访客 / 加购未支付用户",
+      "placement_preference": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels",
+        "Facebook Marketplace"
+      ],
+      "bid_strategy": "lowest_cost",
+      "recommended_peak_hours": "15:00-03:00 UTC (美东 10:00-22:00)",
+      "kpi_benchmarks": {
+        "expected_ctr_pct": 1.2,
+        "expected_cpc_usd": 0.85,
+        "expected_cpm_usd": 12.5,
+        "expected_cpa_usd": 28.33
+      },
+      "priority": 1
+    },
+    {
+      "product_id": "SP-004",
+      "product_name": "Zirconia Flap Disc 4.5\"",
+      "recommended_objective": "conversions",
+      "objective_label": "转化 (Conversions)",
+      "objective_weights": {
+        "engagement": 0.3,
+        "conversions": 0.45,
+        "traffic": 0.25
+      },
+      "daily_budget_range_usd": {
+        "min": 11.0,
+        "max": 44.0
+      },
+      "bid_range_usd": {
+        "min": 0.207,
+        "max": 0.621
+      },
+      "max_cpa_usd": 0.3,
+      "audience_profiles": [
+        "制造业采购经理 (Procurement Manager)",
+        "工厂主 / 车间主管 (Factory Owner / Shop Floor Manager)",
+        "五金 / 工具批发商 (Hardware & Tool Wholesaler)",
+        "金属加工 / 木工企业主 (Metalworking & Woodworking Business Owner)"
+      ],
+      "lookalike_source": "现有 B2B 客户列表 / 展会名片",
+      "placement_preference": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Audience Network"
+      ],
+      "bid_strategy": "target_cost",
+      "recommended_peak_hours": "07:00-20:00 UTC (本地 10:00-23:00)",
+      "kpi_benchmarks": {
+        "expected_ctr_pct": 1.5,
+        "expected_cpc_usd": 0.3,
+        "expected_cpm_usd": 5.0,
+        "expected_cpa_usd": 20.0
+      },
+      "priority": 2
+    },
+    {
+      "product_id": "SP-002",
+      "product_name": "Aluminum Oxide Sanding Belt 6\"x48\"",
+      "recommended_objective": "conversions",
+      "objective_label": "转化 (Conversions)",
+      "objective_weights": {
+        "engagement": 0.1,
+        "conversions": 0.65,
+        "traffic": 0.25
+      },
+      "daily_budget_range_usd": {
+        "min": 17.0,
+        "max": 68.0
+      },
+      "bid_range_usd": {
+        "min": 0.448,
+        "max": 1.346
+      },
+      "max_cpa_usd": 1.19,
+      "audience_profiles": [
+        "制造业采购经理 (Procurement Manager)",
+        "工厂主 / 车间主管 (Factory Owner / Shop Floor Manager)",
+        "五金 / 工具批发商 (Hardware & Tool Wholesaler)",
+        "金属加工 / 木工企业主 (Metalworking & Woodworking Business Owner)"
+      ],
+      "lookalike_source": "现有 B2B 客户列表 / 展会名片",
+      "placement_preference": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Audience Network"
+      ],
+      "bid_strategy": "target_cost",
+      "recommended_peak_hours": "07:00-21:00 UTC (欧洲中部 08:00-22:00)",
+      "kpi_benchmarks": {
+        "expected_ctr_pct": 1.35,
+        "expected_cpc_usd": 0.65,
+        "expected_cpm_usd": 10.0,
+        "expected_cpa_usd": 43.33
+      },
+      "priority": 3
+    }
+  ]
+}

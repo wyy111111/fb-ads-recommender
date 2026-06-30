@@ -324,6 +324,9 @@ def init_session():
         "view_mode": "card",     # "card" or "table"
         "business_type": "B2B",
         "next_product_id": 1,
+        "calibrator": None,      # HistoricalCalibrator instance
+        "calibration_msg": "",   # calibration status message
+        "bias_summary": None,    # bias summary dict for display
         "enrichment_result": None,  # EnrichmentResult for last queried product
     }
     for k, v in defaults.items():
@@ -490,52 +493,84 @@ def render_product_input():
             # ── 手动编辑模式 ──
             st.caption("取消勾选上方按钮后可手动修改各项参数。")
 
+            # --- 生命周期 ---
             lifecycle = st.selectbox(
                 "生命周期",
                 LIFECYCLE_LIST,
                 index=LIFECYCLE_LIST.index(rec_lifecycle) if rec_lifecycle in LIFECYCLE_LIST else 1,
+                help="产品从上市到退市的预计阶段。新品：刚推出市场；成长期：快速扩张；成熟期：稳定销售；衰退期：市场萎缩。",
             )
+
+            # --- 客单价 ---
             c1, c2 = st.columns([3, 2])
             with c1:
                 up_min = max(1.0, rec_unit_price * 0.15)
                 up_max = max(rec_unit_price * 6.0, 100.0)
                 _up_slider = st.slider(
                     "客单价 (USD)",
-                    min_value=up_min, max_value=up_max,
+                    min_value=up_min,
+                    max_value=up_max,
                     value=rec_unit_price,
                     step=max(1.0, round(rec_unit_price * 0.05, 1)),
+                    help="输入产品的平均销售单价，含运费（USD）。不确定时可用系统根据行业自动填充的默认值。",
                     key="up_slider",
                 )
             with c2:
                 unit_price = st.number_input(
-                    "精确输入 (USD)", min_value=0.01,
-                    value=_up_slider, format="%.2f", key="up_manual",
+                    "精确输入 (USD)",
+                    min_value=0.01,
+                    value=_up_slider,
+                    format="%.2f",
+                    key="up_manual",
                 )
+
+            # --- 利润率 ---
             c3, c4 = st.columns([3, 2])
             with c3:
                 _mg_slider = st.slider(
-                    "利润率 (%)", min_value=1, max_value=95,
-                    value=rec_margin, step=1, key="mg_slider",
+                    "利润率 (%)",
+                    min_value=1,
+                    max_value=95,
+                    value=rec_margin,
+                    step=1,
+                    help="毛利润率（%），即 (售价-成本)/售价×100。不确定时可用系统默认值。",
+                    key="mg_slider",
                 )
             with c4:
                 margin = st.number_input(
-                    "精确输入 (%)", min_value=1, max_value=95,
-                    value=_mg_slider, step=1, key="mg_manual",
+                    "精确输入 (%)",
+                    min_value=1,
+                    max_value=95,
+                    value=_mg_slider,
+                    step=1,
+                    key="mg_manual",
                 )
+
+            # --- 转化周期 ---
             c5, c6 = st.columns([3, 2])
             with c5:
                 cd_min = max(1, rec_conv_days - 10)
                 cd_max = rec_conv_days + 30
                 _cd_slider = st.slider(
                     "预期转化周期（天）",
-                    min_value=cd_min, max_value=max(cd_max, 60),
-                    value=rec_conv_days, step=1, key="cd_slider",
+                    min_value=cd_min,
+                    max_value=max(cd_max, 60),
+                    value=rec_conv_days,
+                    step=1,
+                    help="从用户点击广告到完成购买的平均天数。标准快消品填 1-3 天，工业品客户决策周期长可填 14-60 天。",
+                    key="cd_slider",
                 )
             with c6:
                 conv_days = st.number_input(
-                    "精确输入（天）", min_value=1, max_value=365,
-                    value=_cd_slider, step=1, key="cd_manual",
+                    "精确输入（天）",
+                    min_value=1,
+                    max_value=365,
+                    value=_cd_slider,
+                    step=1,
+                    key="cd_manual",
                 )
+
+            # 业务类型
             biz_type_param = st.selectbox(
                 "B2B / B2C", ["B2B", "B2C"],
                 index=0 if ind_defaults["business_type"] == "B2B" else 1,
@@ -617,6 +652,9 @@ def render_product_input():
         st.markdown("---")
         if st.button("生成投流策略", type="primary", use_container_width=True):
             engine = AdsStrategyEngine()
+            # 若已导入历史校准数据，注入引擎
+            if st.session_state["calibrator"] is not None:
+                engine.set_calibrator(st.session_state["calibrator"])
             products_objs = [
                 Product(
                     id=p["id"], name=p["name"], category=p["category"],
@@ -655,6 +693,55 @@ def render_product_input():
                 "ROAS": f"{vals['expected_roas']:.2f}x" if vals.get("expected_roas") else "--",
             })
         st.dataframe(pd.DataFrame(bench_data), use_container_width=True, hide_index=True)
+
+    # ── 历史数据校准导入 ──
+    with st.expander("导入历史数据校准（可选）", expanded=st.session_state.get("calibrator") is not None):
+        st.caption(
+            "上传 CSV 文件，系统自动计算该用户的历史偏差系数，用于修正 KPI 预估。"
+            "CSV 需包含列：product, industry, actual_ctr, actual_cpa（可选 actual_cpc）。"
+            "CTR/CPA 以百分比形式填写（如 1.5 表示 1.5%）。"
+        )
+        uploaded = st.file_uploader(
+            "选择 CSV 文件",
+            type=["csv"],
+            key="calib_csv_uploader",
+            help="CSV 格式：product,industry,actual_ctr,actual_cpa[,actual_cpc]",
+        )
+        if uploaded is not None:
+            csv_bytes = uploaded.read()
+            try:
+                csv_text = csv_bytes.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                csv_text = csv_bytes.decode("gbk", errors="replace")
+            calibrator = HistoricalCalibrator()
+            ok, msg, bias_dict = calibrator.load_from_csv(csv_text)
+            if ok:
+                st.session_state["calibrator"] = calibrator
+                st.session_state["calibration_msg"] = msg
+                st.session_state["bias_summary"] = bias_dict
+                st.success(msg)
+                if bias_dict:
+                    rows = []
+                    for ind, b in bias_dict.items():
+                        rows.append({
+                            "行业": ind,
+                            "CTR偏差系数": b.get("ctr_bias", "--"),
+                            "CPA偏差系数": b.get("cpa_bias", "--"),
+                            "CPC偏差系数": b.get("cpc_bias", "--"),
+                            "样本数": b.get("sample_count", 0),
+                        })
+                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            else:
+                st.error(msg)
+                st.session_state["calibration_msg"] = msg
+
+        if st.session_state.get("calibrator") is not None:
+            st.info(f"历史校准已激活：覆盖 {len(st.session_state['bias_summary'] or {})} 个行业")
+            if st.button("清除历史校准数据", key="clear_calib"):
+                st.session_state["calibrator"] = None
+                st.session_state["calibration_msg"] = ""
+                st.session_state["bias_summary"] = None
+                st.rerun()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -719,16 +806,44 @@ def render_cards(cards: List[StrategyCard]):
         # ── KPI 基准对比判断 ──
         ctr_class, ctr_hint = bench_indicator(card.expected_ctr_pct, card.industry_ctr)
         cpc_class, cpc_hint = bench_indicator(card.expected_cpc, card.industry_cpc, invert=True)
-        cpm_class, cpm_hint = bench_indicator(card.expected_cpm, None)  # CPM 来自市场
-        cpa_class, cpa_hint = bench_indicator(card.max_cpa, card.industry_cpa, invert=True)
+        cpm_class, cpm_hint = bench_indicator(card.expected_cpm, None)
+        cpa_class, cpa_hint = bench_indicator(card.expected_cpa, card.industry_cpa, invert=True)
 
-        # CPM 无行业单独基准，用市场整体值
-        cpm_label = "（预估值）"
+        # ── KPI 数据来源提取 ──
+        ctr_src = card.kpi_data_sources.get("ctr", {})
+        cpc_src = card.kpi_data_sources.get("cpc", {})
+        cpm_src = card.kpi_data_sources.get("cpm", {})
+        cpa_src = card.kpi_data_sources.get("cpa", {})
+
+        # 格式化 KPI 范围
+        def _kpi_ctr(card):
+            lo, hi = card.ctr_range
+            return f"{lo:.2f}% – {hi:.2f}%"
+
+        def _kpi_cpc(card):
+            lo, hi = card.cpc_range
+            return f"${lo:.3f} – ${hi:.3f} USD"
+
+        def _kpi_cpm(card):
+            lo, hi = card.cpm_range
+            return f"${lo:.2f} – ${hi:.2f} USD"
+
+        def _kpi_cpa(card):
+            lo, hi = card.cpa_range
+            return f"${lo:.2f} – ${hi:.2f} USD"
+
+        def _src_line(src: dict) -> str:
+            if not src:
+                return ""
+            conf = src.get("confidence", "--")
+            conf_pct = src.get("confidence_pct", 0)
+            source = src.get("source", "")
+            return f"{source} (可信度: {conf}, {conf_pct}%)"
 
         audience_text = "、".join(card.audience_profiles[:3])
 
         # ── 运费 + 关税估算 ──
-        unit_price = card.max_cpa * 10.0  # 从 CPA 反推近似单价
+        unit_price = card.max_cpa * 10.0
         ship = ShippingEstimator.estimate_shipping(
             product_name=card.product_name,
             unit_price=unit_price,
@@ -774,27 +889,35 @@ def render_cards(cards: List[StrategyCard]):
                 </div>
             </div>
 
-            <!-- 中层 — KPI 四格卡 -->
+            <!-- 中层 — KPI 四格卡 (基准值 + 置信区间 + 数据来源) -->
             <div class="strat-mid">
                 <div class="kpi-cell">
-                    <div class="kpi-label">CTR</div>
-                    <div class="kpi-value">{format_pct(card.expected_ctr_pct)}</div>
+                    <div class="kpi-label">CTR 预估</div>
+                    <div class="kpi-value" style="font-size:16px;">{_kpi_ctr(card)}</div>
+                    <div style="font-size:12px;color:#6b7280;margin-top:2px;">中位 {card.expected_ctr_pct:.2f}%</div>
                     <div class="kpi-bench {ctr_class}">{ctr_hint}</div>
+                    <div style="font-size:10px;color:#9ca3af;margin-top:3px;line-height:1.3;">{_src_line(ctr_src)}</div>
                 </div>
                 <div class="kpi-cell">
-                    <div class="kpi-label">CPC</div>
-                    <div class="kpi-value">{format_usd(card.expected_cpc)}</div>
+                    <div class="kpi-label">CPC 预估</div>
+                    <div class="kpi-value" style="font-size:16px;">{_kpi_cpc(card)}</div>
+                    <div style="font-size:12px;color:#6b7280;margin-top:2px;">中位 ${card.expected_cpc:.3f} USD</div>
                     <div class="kpi-bench {cpc_class}">{cpc_hint}</div>
+                    <div style="font-size:10px;color:#9ca3af;margin-top:3px;line-height:1.3;">{_src_line(cpc_src)}</div>
                 </div>
                 <div class="kpi-cell">
-                    <div class="kpi-label">CPM</div>
-                    <div class="kpi-value">{format_usd(card.expected_cpm)}</div>
-                    <div class="kpi-bench bench-flat">{cpm_label}</div>
+                    <div class="kpi-label">CPM 预估</div>
+                    <div class="kpi-value" style="font-size:16px;">{_kpi_cpm(card)}</div>
+                    <div style="font-size:12px;color:#6b7280;margin-top:2px;">中位 ${card.expected_cpm:.2f} USD</div>
+                    <div class="kpi-bench bench-flat">（预估值）</div>
+                    <div style="font-size:10px;color:#9ca3af;margin-top:3px;line-height:1.3;">{_src_line(cpm_src)}</div>
                 </div>
                 <div class="kpi-cell">
-                    <div class="kpi-label">CPA 上限</div>
-                    <div class="kpi-value">{format_usd(card.max_cpa)}</div>
+                    <div class="kpi-label">CPA 预估</div>
+                    <div class="kpi-value" style="font-size:16px;">{_kpi_cpa(card)}</div>
+                    <div style="font-size:12px;color:#6b7280;margin-top:2px;">中位 ${card.expected_cpa:.2f} USD</div>
                     <div class="kpi-bench {cpa_class}">{cpa_hint}</div>
+                    <div style="font-size:10px;color:#9ca3af;margin-top:3px;line-height:1.3;">{_src_line(cpa_src)}</div>
                 </div>
             </div>
 
@@ -877,7 +1000,10 @@ def render_cards(cards: List[StrategyCard]):
             </div>
 
             <!-- 数据源行 -->
-            <div class="data-source-line">{card.data_confidence}</div>
+            <div class="data-source-line">
+                {card.data_confidence} | 模型: {card.model_version or MODEL_VERSION}
+                {f' | 历史校准: 已激活' if card.calibration_applied else ''}
+            </div>
 
         </div>
         """)
@@ -891,6 +1017,11 @@ def render_comparison_table(cards: List[StrategyCard]):
     rows = []
     for card in cards:
         sc = score_color(card.priority_score)
+        # KPI 范围格式化
+        ctr_str = f"{card.expected_ctr_pct:.2f}% ({card.ctr_range[0]:.2f}–{card.ctr_range[1]:.2f}%)"
+        cpc_str = f"${card.expected_cpc:.3f} (${card.cpc_range[0]:.3f}–${card.cpc_range[1]:.3f})"
+        cpm_str = f"${card.expected_cpm:.2f} (${card.cpm_range[0]:.2f}–${card.cpm_range[1]:.2f})"
+        cpa_str = f"${card.expected_cpa:.2f} (${card.cpa_range[0]:.2f}–${card.cpa_range[1]:.2f})"
         rows.append({
             "产品": card.product_name,
             "行业": card.category,
@@ -899,10 +1030,10 @@ def render_comparison_table(cards: List[StrategyCard]):
             "主推目标": card.recommended_objective,
             "日预算(USD)": f"{format_usd(card.daily_budget_range[0])} – {format_usd(card.daily_budget_range[1])}",
             "出价策略": card.bid_strategy,
-            "CPA上限(USD)": format_usd(card.max_cpa),
-            "CTR": format_pct(card.expected_ctr_pct),
-            "CPC(USD)": format_usd(card.expected_cpc),
-            "CPM(USD)": format_usd(card.expected_cpm),
+            "CTR(区间)": ctr_str,
+            "CPC(区间 USD)": cpc_str,
+            "CPM(区间 USD)": cpm_str,
+            "CPA预估(区间 USD)": cpa_str,
             "ROI": f"{card.roi_estimate:.2f}x",
             "市场": card.market,
             "类型": card.business_type,
@@ -988,6 +1119,12 @@ def main():
 
     # 以 query_params 为准决定当前页面
     page = query_page
+
+    # ── 侧边栏底部 — 模型版本信息 ──
+    st.sidebar.markdown("---")
+    st.sidebar.caption(f"KPI 模型版本: **{MODEL_VERSION}**")
+    st.sidebar.caption(f"最后更新: {MODEL_LAST_UPDATED}")
+    st.sidebar.caption("数据基准: WordStream 2026 + DigitalPoint 2026")
 
     if page == "产品管理":
         render_product_input()
