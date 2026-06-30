@@ -10,6 +10,8 @@
 交叉验证后取中位数，修正偏差。
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re

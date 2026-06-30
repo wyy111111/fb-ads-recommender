@@ -43,6 +43,14 @@ from fb_ads_recommender import (
     TariffCalculator,
 )
 
+from utils.ai_analyzer import (
+    AIStrategyAnalyzer,
+    AIAnalysisResult,
+    RiskItem,
+    OptimizationSuggestion,
+    CreativeAngle,
+)
+
 # ═══════════════════════════════════════════════════════════════════
 # Page config
 # ═══════════════════════════════════════════════════════════════════
@@ -398,9 +406,12 @@ def render_product_input():
         if er is not None and er.enriched:
             with col_enrich_info:
                 src = er.data_source or "本地参考表"
-                price_str = f"${er.unit_price_usd:,.2f} USD"
-                if er.unit_price_low and er.unit_price_high:
-                    price_str = f"${er.unit_price_low:,.0f}–${er.unit_price_high:,.0f} USD（参考均价 ${er.unit_price_usd:,.2f}）"
+                if er.unit_price_usd is not None:
+                    price_str = f"${er.unit_price_usd:,.2f} USD"
+                    if er.unit_price_low and er.unit_price_high:
+                        price_str = f"${er.unit_price_low:,.0f}–${er.unit_price_high:,.0f} USD（参考均价 ${er.unit_price_usd:,.2f}）"
+                else:
+                    price_str = "暂无参考数据（小众品类）"
                 margin_str = f"{er.profit_margin_pct:.0f}%" if er.profit_margin_pct else "未知"
                 st.success(
                     f"市场查询结果：客单价 {price_str}，利润率 {margin_str}，"
@@ -792,6 +803,131 @@ def render_strategy_results():
         render_cards(cards)
     else:
         render_comparison_table(cards)
+
+    # ── AI 智能分析区 ──
+    st.markdown("---")
+    st.header("AI 策略分析")
+    render_ai_analysis_area(cards)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 智能分析面板渲染
+# ═══════════════════════════════════════════════════════════════════
+
+def render_ai_analysis_area(cards: List[StrategyCard]):
+    """渲染 AI 策略分析面板"""
+    with st.expander("展开 AI 智能分析报告", expanded=False):
+        for i, card in enumerate(cards):
+            analysis = AIStrategyAnalyzer.analyze(card)
+
+            st.markdown(f"## {i+1}. {card.product_name} 策略分析")
+            st.markdown("---" if len(cards) > 1 else "")
+
+            # ── 一行定论 ──
+            st.info(f"**诊断意见：** {analysis.one_line_verdict}")
+
+            # ── 策略摘要 ──
+            with st.container(border=True):
+                st.markdown("#### 策略摘要")
+                st.markdown(analysis.strategy_summary)
+
+            # ── 两列布局：左=风险，右=创意 ──
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # 风险评估
+                st.markdown("#### 风险与应对")
+                if analysis.risks:
+                    risk_color = {
+                        "high": "🔴",
+                        "medium": "🟡",
+                        "low": "🟢",
+                    }
+                    for risk in analysis.risks:
+                        icon = risk_color.get(risk.level, "⚪")
+                        with st.container(border=True):
+                            st.markdown(f"{icon} **{risk.title}** ({risk.level.upper()})")
+                            st.caption(risk.detail)
+                            st.markdown(f"**应对：** {risk.mitigation}")
+                else:
+                    st.caption("未发现明显风险")
+
+            with col2:
+                # 创意角度
+                st.markdown("#### 推荐创意方向")
+                if analysis.creative_angles:
+                    for angle in analysis.creative_angles:
+                        with st.container(border=True):
+                            st.markdown(f"**{angle.angle_name}**")
+                            st.caption(f"钩子：「{angle.hook}」")
+                            st.markdown(f"适合格式：{angle.format_fit} · 目标情绪：{angle.target_emotion}")
+                else:
+                    st.caption("暂无推荐")
+
+            # ── 创意公式 ──
+            with st.container(border=True):
+                st.markdown("#### 创意叙事公式")
+                st.success(f"**{analysis.creative_formula}**")
+
+            # ── 创意最佳实践 ──
+            with st.container(border=True):
+                st.markdown("#### 创意最佳实践")
+                for tip in analysis.creative_best_practices:
+                    st.markdown(f"- {tip}")
+
+            # ── 预算分析 ──
+            col3, col4 = st.columns([1, 2])
+            with col3:
+                score_val = analysis.budget_score
+                bar_class = "score-excellent" if score_val >= 80 else ("score-medium" if score_val >= 60 else "score-poor")
+                st.markdown(f"#### 预算健康度")
+                st.markdown(f'<div style="text-align:center;padding:8px;"><span class="strat-score-badge {bar_class}">{score_val}/100</span></div>', unsafe_allow_html=True)
+            with col4:
+                with st.container(border=True):
+                    st.markdown(f"**评估：** {analysis.budget_assessment}")
+                    st.markdown(f"**建议：** {analysis.budget_suggestion}")
+
+            # ── 优化建议 ──
+            st.markdown("#### 优化建议（按优先级排序）")
+            if analysis.optimizations:
+                for opt in analysis.optimizations:
+                    priority_icon = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢", 5: "⚪"}
+                    p_icon = priority_icon.get(opt.priority, "⚪")
+                    with st.container(border=True):
+                        st.markdown(
+                            f"{p_icon} **{opt.suggestion}** (优先级 P{opt.priority})"
+                        )
+                        st.markdown(f"影响：{opt.expected_impact} · 难度：{opt.difficulty}")
+            else:
+                st.caption("暂无优化建议")
+
+            # ── 竞品定位 ──
+            with st.container(border=True):
+                st.markdown("#### 竞品定位")
+                st.markdown(analysis.competitive_position)
+                if analysis.competitive_advantages:
+                    for adv in analysis.competitive_advantages:
+                        st.markdown(f"- ✅ {adv}")
+                if analysis.competitive_watchouts:
+                    for w in analysis.competitive_watchouts:
+                        st.markdown(f"- ⚠️ {w}")
+
+            # ── 投放阶段规划 ──
+            if analysis.campaign_phases:
+                st.markdown("#### 投放阶段规划")
+                phases_tabs = st.tabs([p["phase"] for p in analysis.campaign_phases])
+                for idx, tab in enumerate(phases_tabs):
+                    with tab:
+                        phase = analysis.campaign_phases[idx]
+                        st.markdown(f"**阶段目标：** {phase['objective']}")
+                        st.markdown(f"**预算占比：** {phase['budget_pct']}% (~${phase['daily_usd']:.0f} USD/天)")
+                        st.markdown("**执行动作：**")
+                        for action in phase["actions"]:
+                            st.markdown(f"- {action}")
+                        st.markdown(f"**成功标准：** {phase['success_criteria']}")
+
+            # ── AI 分析元信息 ──
+            st.caption(f"AI 策略分析 — {analysis.model_version} · {analysis.analysis_timestamp}")
 
 
 # ═══════════════════════════════════════════════════════════════════
