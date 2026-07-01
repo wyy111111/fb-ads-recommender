@@ -397,34 +397,90 @@ def render_product_input():
         </div>
         """)
 
+        # ── 数据源切换 ──
+        ai_modes = ["auto", "local"] if not _GPT_AVAILABLE else ["auto", "local", "ai"]
+        enrich_mode = st.radio(
+            "数据源",
+            ai_modes,
+            format_func=lambda x: {"auto": "本地优先 + AI 兜底", "local": "仅本地", "ai": "仅 AI 估算"}[x],
+            horizontal=True,
+            key="enrich_mode",
+            help="auto：先查本地，未命中自动 AI 搜索 | local：只查本地参考表 | ai：直接用 AI 估算",
+        )
+        if not _GPT_AVAILABLE:
+            st.caption("安装 `openai python-dotenv` 并配置 API Key 后可启用 AI 估算")
+
         # ── 市场数据查询按钮 ──
         col_enrich_btn, col_enrich_info = st.columns([1, 3])
         with col_enrich_btn:
-            if st.button("查询市场数据", key="enrich_btn", help="查询产品市场参考数据（本地参考表），自动填充客单价和利润率"):
-                with st.spinner("正在查询产品市场数据..."):
-                    er = ProductEnricher.enrich(
-                        product_name.strip(),
-                        subcategory=sub_name,
-                        subcategory_matched=sub_matched,
-                    )
-                    st.session_state["enrichment_result"] = er
+            btn_help = {
+                "auto": "先本地后 AI 搜索",
+                "local": "仅查询本地参考表",
+                "ai": "AI 估算客单价和利润率",
+            }[enrich_mode]
+            if st.button("查询市场数据", key="enrich_btn", help=btn_help):
+                if enrich_mode == "ai":
+                    with st.spinner(f"AI 正在估算「{product_name.strip()}」市场数据..."):
+                        er = ProductEnricher.enrich_with_search(
+                            product_name.strip(),
+                            search_fn=GPTAnalyzer.search_market_data,
+                            subcategory=sub_name,
+                            subcategory_matched=sub_matched,
+                            force_search=True,
+                        )
+                elif enrich_mode == "local":
+                    with st.spinner("正在查询本地参考表..."):
+                        er = ProductEnricher.enrich(
+                            product_name.strip(),
+                            subcategory=sub_name,
+                            subcategory_matched=sub_matched,
+                        )
+                else:  # auto
+                    with st.spinner("正在查询本地参考表..."):
+                        er = ProductEnricher.enrich(
+                            product_name.strip(),
+                            subcategory=sub_name,
+                            subcategory_matched=sub_matched,
+                        )
+                    if not er.enriched:
+                        with st.spinner(f"本地未命中，正在 AI 搜索「{product_name.strip()}」市场数据..."):
+                            er = ProductEnricher.enrich_with_search(
+                                product_name.strip(),
+                                search_fn=GPTAnalyzer.search_market_data,
+                                subcategory=sub_name,
+                                subcategory_matched=sub_matched,
+                            )
+                st.session_state["enrichment_result"] = er
 
         er = st.session_state.get("enrichment_result")
         if er is not None and er.enriched:
             with col_enrich_info:
                 src = er.data_source or "本地参考表"
+                is_ai = any(kw in src.lower() for kw in ("web search", "gpt", "ai", "deepseek"))
+
                 if er.unit_price_usd is not None:
                     price_str = f"${er.unit_price_usd:,.2f} USD"
                     if er.unit_price_low and er.unit_price_high:
-                        price_str = f"${er.unit_price_low:,.0f}–${er.unit_price_high:,.0f} USD（参考均价 ${er.unit_price_usd:,.2f}）"
+                        price_str = f"${er.unit_price_low:,.0f}–${er.unit_price_high:,.0f} USD（均价 ${er.unit_price_usd:,.2f}）"
                 else:
                     price_str = "暂无参考数据（小众品类）"
+
                 margin_str = f"{er.profit_margin_pct:.0f}%" if er.profit_margin_pct else "未知"
-                st.success(
-                    f"市场查询结果：客单价 {price_str}，利润率 {margin_str}，"
-                    f"数据来源: {src}",
-                    icon="✅",
-                )
+                conf = er.confidence or "medium"
+                conf_label = {"high": "高", "medium": "中", "low": "低", "unknown": "未知"}.get(conf, conf)
+
+                if is_ai:
+                    st.info(
+                        f"AI 估算：客单价 {price_str}，利润率 {margin_str}  "
+                        f"（{src}，置信度: {conf_label}）",
+                        icon="🤖",
+                    )
+                else:
+                    st.success(
+                        f"市场查询结果：客单价 {price_str}，利润率 {margin_str}  "
+                        f"来源: {src}",
+                        icon="✅",
+                    )
         elif er is not None and not er.enriched:
             with col_enrich_info:
                 st.info(
@@ -1019,6 +1075,118 @@ def render_cards(cards: List[StrategyCard]):
 
         audience_text = "、".join(card.audience_profiles[:3])
 
+        # ── AI 建议（素材推荐 + 执行指南） ──
+        ai_suggestions = None
+        if _GPT_AVAILABLE:
+            try:
+                card_dict = {
+                    "objective": card.recommended_objective,
+                    "daily_budget": f"${card.daily_budget_range[0]:.0f}–${card.daily_budget_range[1]:.0f}",
+                    "market": card.market,
+                    "business_type": card.business_type,
+                    "expected_ctr_pct": round(card.expected_ctr_pct, 2),
+                    "expected_cpc": round(card.expected_cpc, 3),
+                    "expected_cpa": round(card.expected_cpa, 2),
+                    "priority_score": card.priority_score,
+                }
+                ai_suggestions = GPTAnalyzer.generate_card_suggestions(
+                    card_dict=card_dict,
+                    product_name=card.product_name,
+                    product_category=card.category,
+                    business_type=card.business_type,
+                )
+            except Exception:
+                ai_suggestions = None
+
+        # ── 构建素材推荐 HTML ──
+        if ai_suggestions and ai_suggestions.get("ai_creative"):
+            ai_creative = ai_suggestions["ai_creative"]
+            creative_html = f"""
+            <div style="padding:14px 22px;border-top:1px solid #f0f0f0;background:#fafbff;">
+                <div style="font-size:14px;font-weight:700;color:#2563eb;margin-bottom:10px;">
+                    推荐素材类型 <span style="font-size:10px;color:#9ca3af;font-weight:400;">AI 生成建议</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:13px;">
+                    <div>
+                        <span style="color:#9ca3af;">格式：</span>
+                        <strong>{ai_creative.get('format', card.creative_format)}</strong>
+                    </div>
+                    <div>
+                        <span style="color:#9ca3af;">比例：</span>
+                        <strong>{ai_creative.get('ratio', card.creative_ratio)}</strong>
+                    </div>
+                    <div>
+                        <span style="color:#9ca3af;">CTA：</span>
+                        <strong style="color:#2563eb;">{ai_creative.get('cta', card.creative_cta)}</strong>
+                    </div>
+                </div>
+                <div style="margin-top:10px;font-size:12px;color:#6b7280;line-height:1.8;">
+                    {''.join(f'<div style="display:flex;align-items:flex-start;gap:6px;"><span style="color:#22c55e;flex-shrink:0;">●</span><span>{tip}</span></div>' for tip in ai_creative.get('tips', card.creative_tips))}
+                </div>
+            </div>"""
+        else:
+            creative_html = f"""
+            <div style="padding:14px 22px;border-top:1px solid #f0f0f0;background:#fafbff;">
+                <div style="font-size:14px;font-weight:700;color:#2563eb;margin-bottom:10px;">
+                    推荐素材类型
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:13px;">
+                    <div>
+                        <span style="color:#9ca3af;">格式：</span>
+                        <strong>{card.creative_format}</strong>
+                    </div>
+                    <div>
+                        <span style="color:#9ca3af;">比例：</span>
+                        <strong>{card.creative_ratio}</strong>
+                    </div>
+                    <div>
+                        <span style="color:#9ca3af;">CTA：</span>
+                        <strong style="color:#2563eb;">{card.creative_cta}</strong>
+                    </div>
+                </div>
+                <div style="margin-top:10px;font-size:12px;color:#6b7280;line-height:1.8;">
+                    {''.join(f'<div style="display:flex;align-items:flex-start;gap:6px;"><span style="color:#22c55e;flex-shrink:0;">●</span><span>{tip}</span></div>' for tip in card.creative_tips)}
+                </div>
+            </div>"""
+
+        # ── 构建执行指南 HTML ──
+        if ai_suggestions and ai_suggestions.get("ai_execution"):
+            ai_exec = ai_suggestions["ai_execution"]
+            exec_steps = ai_exec.get('steps', card.execution_steps)
+            exec_budget = ai_exec.get('budget_split', card.budget_split)
+            exec_testing = ai_exec.get('testing_strategy', card.testing_strategy)
+            execution_html = f"""
+            <div style="padding:14px 22px;border-top:1px solid #f0f0f0;">
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px;">
+                    投放执行指南 <span style="font-size:10px;color:#9ca3af;font-weight:400;">AI 生成建议</span>
+                </div>
+                <div style="font-size:12px;color:#4b5563;line-height:2.0;">
+                    {''.join(f'<div>{step}</div>' for step in exec_steps)}
+                </div>
+                <div style="margin-top:8px;padding:8px 12px;background:#fffbeb;border-radius:6px;font-size:12px;color:#92400e;">
+                    <strong>预算分配：</strong>{exec_budget}
+                </div>
+                <div style="margin-top:6px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#166534;">
+                    <strong>A/B 测试：</strong>{exec_testing}
+                </div>
+            </div>"""
+        else:
+            execution_html = f"""
+            <div style="padding:14px 22px;border-top:1px solid #f0f0f0;">
+                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px;">
+                    投放执行指南
+                </div>
+                <div style="font-size:12px;color:#4b5563;line-height:2.0;">
+                    {''.join(f'<div>{step}</div>' for step in card.execution_steps)}
+                </div>
+                <div style="margin-top:8px;padding:8px 12px;background:#fffbeb;border-radius:6px;font-size:12px;color:#92400e;">
+                    <strong>预算分配：</strong>{card.budget_split}
+                </div>
+                <div style="margin-top:6px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#166534;">
+                    <strong>A/B 测试：</strong>{card.testing_strategy}
+                </div>
+            </div>"""
+
         # ── 运费 + 关税估算 ──
         unit_price = card.max_cpa * 10.0
         ship = ShippingEstimator.estimate_shipping(
@@ -1158,45 +1326,9 @@ def render_cards(cards: List[StrategyCard]):
                 </div>
             </div>
 
-            <!-- 素材推荐模块 -->
-            <div style="padding:14px 22px;border-top:1px solid #f0f0f0;background:#fafbff;">
-                <div style="font-size:14px;font-weight:700;color:#2563eb;margin-bottom:10px;">
-                    推荐素材类型
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:13px;">
-                    <div>
-                        <span style="color:#9ca3af;">格式：</span>
-                        <strong>{card.creative_format}</strong>
-                    </div>
-                    <div>
-                        <span style="color:#9ca3af;">比例：</span>
-                        <strong>{card.creative_ratio}</strong>
-                    </div>
-                    <div>
-                        <span style="color:#9ca3af;">CTA：</span>
-                        <strong style="color:#2563eb;">{card.creative_cta}</strong>
-                    </div>
-                </div>
-                <div style="margin-top:10px;font-size:12px;color:#6b7280;line-height:1.8;">
-                    {''.join(f'<div style="display:flex;align-items:flex-start;gap:6px;"><span style="color:#22c55e;flex-shrink:0;">●</span><span>{tip}</span></div>' for tip in card.creative_tips)}
-                </div>
-            </div>
+            {creative_html}
 
-            <!-- 投放执行指南模块 -->
-            <div style="padding:14px 22px;border-top:1px solid #f0f0f0;">
-                <div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px;">
-                    投放执行指南
-                </div>
-                <div style="font-size:12px;color:#4b5563;line-height:2.0;">
-                    {''.join(f'<div>{step}</div>' for step in card.execution_steps)}
-                </div>
-                <div style="margin-top:8px;padding:8px 12px;background:#fffbeb;border-radius:6px;font-size:12px;color:#92400e;">
-                    <strong>预算分配：</strong>{card.budget_split}
-                </div>
-                <div style="margin-top:6px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#166534;">
-                    <strong>A/B 测试：</strong>{card.testing_strategy}
-                </div>
-            </div>
+            {execution_html}
 
             <!-- 运费 + 关税估算折叠区 -->
             <div style="padding:14px 22px;border-top:1px solid #e5e7eb;background:#fafbfc;">
